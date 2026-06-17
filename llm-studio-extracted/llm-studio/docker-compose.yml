@@ -1,0 +1,42 @@
+services:
+  # ─── PostgreSQL database ───────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: llm_studio
+      POSTGRES_USER: llm_studio
+      POSTGRES_PASSWORD: llm_studio
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"          # Remove in production if DB should be private
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U llm_studio"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── API server ────────────────────────────────────────────────────────────
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://llm_studio:llm_studio@db:5432/llm_studio
+      PORT: 3001
+      NODE_ENV: production
+      # Uncomment to pre-configure the API key without touching the UI:
+      # OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+    ports:
+      - "${PORT:-3001}:3001"
+    env_file:
+      - path: ./server/.env
+        required: false   # Optional — falls back to defaults above
+
+volumes:
+  postgres_data:
